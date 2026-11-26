@@ -1,0 +1,34 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "ua.putevoy.uchet"
+    compileSdk 34
+    defaultConfig {
+        applicationId "ua.putevoy.uchet"
+        minSdk 26
+        targetSdk 34
+        versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger())
+        versionName "1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+    }
+    signingConfigs {
+        // A fixed key kept in the repo so every new APK installs over the old one without wiping records.
+        release {
+            storeFile file("uchet.keystore")
+            storePassword "putevoy-uchet"
+            keyAlias "uchet"
+            keyPassword "putevoy-uchet"
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+// The app shows the very same index.html as the Telegram version: copy it from the repo root on every build.
+def copyWebPage = tasks.register("copyWebPage", Copy) {
+    from(rootProject.file("../index.html"))
+    into(layout.buildDirectory.dir("webassets"))
+}
+android.sourceSets.main.assets.srcDirs += layout.buildDirectory.dir("webassets").get().asFile
+tasks.named("preBuild") { dependsOn copyWebPage }
