@@ -196,10 +196,20 @@ let toastT;
 function toast(t){let el=document.querySelector(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2200)}
 function delBtn(c,id){return `<button class="del" data-del="${esc(c)}" data-id="${esc(id)}">Удалить</button>`}
 
+/* Fuel consumption, full-tank method: liters at a fill-up / km since the previous fill-up with an odometer reading x 100 */
+function consumption(){
+  const arr=S.fuel.filter(x=>+x.odo>0).slice().sort((a,b)=>(+a.odo)-(+b.odo)||(a.date||"").localeCompare(b.date||""));
+  const per={};
+  for(let i=1;i<arr.length;i++){const km=(+arr[i].odo)-(+arr[i-1].odo),l=+arr[i].liters;
+    if(km>0&&l>0)per[arr[i].id]={km,l,r:l/km*100}}
+  return per;
+}
+const fmt1=n=>(Math.round(n*10)/10).toLocaleString("ru-RU");
+function monthRate(list,per){let km=0,l=0;list.forEach(x=>{const c=per[x.id];if(c){km+=c.km;l+=c.l}});return km>0?{km,r:l/km*100}:null}
 function totals(){
   const t=S.trips.filter(x=>inMonth(x.date)), p=S.pallets.filter(x=>inMonth(x.date)), f=S.fuel.filter(x=>inMonth(x.date));
   const sum=(a,k)=>a.reduce((s,x)=>s+(+x[k]||0),0);
-  return {t,p,f,tSum:sum(t,"price"),pSum:sum(p,"amount"),pQty:sum(p,"qty"),fSum:sum(f,"amount"),fL:sum(f,"liters")};
+  return {t,p,f,tSum:sum(t,"price"),pSum:sum(p,"amount"),pQty:sum(p,"qty"),fSum:sum(f,"amount"),fL:sum(f,"liters"),fRate:monthRate(f,consumption())};
 }
 
 /* ---------- views ---------- */
@@ -213,7 +223,7 @@ function vSum(){
     <div class="split">
       <div class="stat"><small>Ходки · ${T.t.length} шт.</small><span class="v num">${rub(T.tSum)}</span></div>
       <div class="stat"><small>Поддоны · ${T.pQty} шт.</small><span class="v num">${rub(T.pSum)}</span></div>
-      <div class="stat fuel"><small>Заправки · ${T.f.length} раз${T.fL?` · ${(Math.round(T.fL*10)/10).toLocaleString("ru-RU")} л`:""} (не вычитаются из дохода)</small><span class="v num">${rub(T.fSum)}</span></div>
+      <div class="stat fuel"><small>Заправки · ${T.f.length} ${(n=>{const d=n%10,h=n%100;return d>=2&&d<=4&&(h<12||h>14)?"раза":"раз"})(T.f.length)}${T.fL?` · ${fmt1(T.fL)} л`:""}${T.fRate?` · расход ${fmt1(T.fRate.r)} л/100 км`:""} (не вычитаются из дохода)</small><span class="v num">${rub(T.fSum)}</span></div>
     </div>
   </section>
   <section class="card">
@@ -284,6 +294,7 @@ function vPallets(){
 function vFuel(){
   const list=S.fuel.filter(x=>inMonth(x.date)).sort(byDate);
   const a=list.reduce((s,x)=>s+(+x.amount||0),0);
+  const per=consumption(), mr=monthRate(list,per);
   return `
   <section class="card">
     <h2>Заправка</h2>
@@ -294,16 +305,17 @@ function vFuel(){
       </div>
       <div class="row">
         <label>Дата<input type="date" id="fDate" value="${today()}"></label>
-        <label>Пробег, км<input id="fOdo" inputmode="numeric" placeholder="необязательно"></label>
+        <label>Пробег по одометру, км<input id="fOdo" inputmode="numeric" placeholder="245300"></label>
       </div>
       <label>АЗС / заметка<input id="fNote" placeholder="необязательно" autocomplete="off"></label>
       <button class="btn" type="submit">Записать заправку</button>
     </form>
-    <p class="note">Заправки только для учёта, из дохода они не вычитаются.</p>
+    <p class="note">Расход считается между двумя заправками: литры этой заправки делятся на километры с прошлой заправки. Заправляйтесь до полного бака и вписывайте пробег каждый раз, тогда цифра будет точной. Из дохода заправки не вычитаются.</p>
   </section>
   <section class="card">
     <div class="head"><h2>Заправки за ${MONTHS[ym.m].toLowerCase()}</h2><span class="li-amt fuel num">${rub(a)}</span></div>
-    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b class="num">${x.liters?(x.liters+" л"):"—"}${x.liters&&x.amount?" · "+rub(x.amount/x.liters)+"/л":""}</b><small>${fmtDate(x.date)}${x.odo?" · "+Number(x.odo).toLocaleString("ru-RU")+" км":""}${x.note?" · "+esc(x.note):""}</small></div><span class="li-amt fuel num">${rub(x.amount)}</span>${delBtn("fuel",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Заправок за этот месяц нет.</p>`}
+    ${mr?`<div class="stat"><small>Средний расход за месяц · ${Math.round(mr.km).toLocaleString("ru-RU")} км</small><span class="v num">${fmt1(mr.r)} л/100 км</span></div>`:""}
+    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b class="num">${x.liters?(fmt1(+x.liters)+" л"):"—"}${per[x.id]?" · "+fmt1(per[x.id].r)+" л/100 км":""}</b><small>${fmtDate(x.date)}${x.odo?" · "+Number(x.odo).toLocaleString("ru-RU")+" км":""}${per[x.id]?" · +"+Math.round(per[x.id].km).toLocaleString("ru-RU")+" км":""}${x.note?" · "+esc(x.note):""}</small></div><span class="li-amt fuel num">${rub(x.amount)}</span>${delBtn("fuel",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Заправок за этот месяц нет.</p>`}
   </section>`;
 }
 
