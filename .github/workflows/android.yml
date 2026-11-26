@@ -1,0 +1,41 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main, claude/project-thread-awcdny]
+    paths: [index.html, android/**, .github/workflows/android.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        working-directory: android
+        run: gradle --no-daemon assembleRelease
+      - name: Rename
+        run: cp android/app/build/outputs/apk/release/app-release.apk putevoy-uchet.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: putevoy-uchet-apk
+          path: putevoy-uchet.apk
+      - name: Publish to the "android" release (a stable download link for the phone)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android
+          name: Путевой учёт для Android
+          body: Скачайте putevoy-uchet.apk на телефон и откройте файл, чтобы установить или обновить приложение.
+          files: putevoy-uchet.apk
+          make_latest: true

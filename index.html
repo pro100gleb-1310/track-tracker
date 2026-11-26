@@ -149,6 +149,7 @@ const byDate=(a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.
 /* ---------- storage: Telegram CloudStorage (synced to the user's Telegram account), browser storage outside Telegram ---------- */
 const TG=window.Telegram&&Telegram.WebApp;
 const inTG=!!(TG&&TG.initData);
+const inApp=/PutevoyUchet\/Android/.test(navigator.userAgent); // the Android APK wraps this same page
 const CS=inTG&&TG.isVersionAtLeast&&TG.isVersionAtLeast("6.9")?TG.CloudStorage:null;
 const CHUNK=3000;
 let lastChunks=[];
@@ -184,7 +185,7 @@ function applyTheme(){if(inTG)document.documentElement.setAttribute("data-theme"
 async function boot(){
   if(inTG){try{TG.ready();TG.expand();try{TG.isVersionAtLeast("7.7")&&TG.disableVerticalSwipes()}catch(_){}applyTheme();TG.onEvent("themeChanged",applyTheme);
     const h=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();TG.setHeaderColor&&TG.setHeaderColor(h);TG.setBackgroundColor&&TG.setBackgroundColor(h)}catch(e){}}
-  else banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
+  else if(!inApp)banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
   render();
   try{await loadAll()}catch(e){toast("Ошибка загрузки: "+e)}
   mode="ready";render();
@@ -231,6 +232,7 @@ function vSum(){
     ${rows.length?`<ul class="list">${rows.map(([k,v])=>`<li><div class="li-main"><b>${esc(k)}</b><small>${v.n} шт.</small></div><span class="li-amt num">${rub(v.s)}</span></li>`).join("")}</ul>`:`<p class="empty">В этом месяце ходок пока нет. Откройте вкладку «Ходки» и нажмите на маршрут, чтобы записать.</p>`}
   </section>
   <details class="card" id="backup"><summary>Резервная копия (CSV для Excel)</summary><p class="note">Выделите текст, скопируйте и сохраните, например, в «Избранное» Telegram.</p><textarea id="csvBox" readonly rows="6"></textarea></details>
+  <details class="card" id="transfer"><summary>Перенос записей (Telegram ↔ Android)</summary><p class="note">На старом устройстве нажмите «Скопировать код». На новом вставьте код в поле ниже и нажмите «Добавить записи». Уже существующие записи не дублируются.</p><div class="row"><button class="btn ghost" type="button" data-copycode>Скопировать код</button></div><textarea id="codeBox" rows="4" placeholder="Вставьте сюда код переноса"></textarea><div class="row"><button class="btn" type="button" data-importcode>Добавить записи</button></div></details>
   ${mode==="loading"?`<p class="note">Загружаю записи…</p>`:""}`;
 }
 
@@ -360,6 +362,15 @@ view.addEventListener("click",async e=>{
     li.innerHTML=`<div class="li-main"><b>${esc(route.name)}</b></div><input id="ep_${esc(route.id)}" inputmode="decimal" value="${esc(route.price)}" style="max-width:110px"><button class="del" data-saveprice="${esc(route.id)}">Сохранить</button>`;
     li.querySelector("input").focus();return;
   }
+  if(e.target.closest("[data-copycode]")){
+    const b=document.getElementById("codeBox");const code=JSON.stringify(S);b.value=code;b.select();
+    let ok=false;try{await navigator.clipboard.writeText(code);ok=true}catch(_){try{ok=document.execCommand("copy")}catch(__){}}
+    toast(ok?"Код скопирован. Вставьте его на другом устройстве":"Выделите текст в поле и скопируйте");return}
+  if(e.target.closest("[data-importcode]")){
+    let o;try{o=JSON.parse(document.getElementById("codeBox").value.trim())}catch(_){toast("Код не распознан. Скопируйте его целиком");return}
+    let n=0;COLS.forEach(c=>{if(!Array.isArray(o[c]))return;const have=new Set(S[c].map(x=>x.id));o[c].forEach(x=>{if(x&&typeof x==="object"&&x.id&&!have.has(x.id)){S[c].push(x);have.add(x.id);n++}})});
+    if(!n){toast("Новых записей нет");return}
+    render();try{await persist();toast("Добавлено записей: "+n)}catch(err){toast("Не сохранилось: "+(err.code||err))}return}
   const sp=e.target.closest("[data-saveprice]");
   if(sp){const v=num(document.getElementById("ep_"+sp.dataset.saveprice).value);if(!(v>=0)){toast("Введите цену числом");return}
     try{await patch("routes",sp.dataset.saveprice,{price:v});toast("Цена обновлена");render()}catch(err){toast("Не сохранилось: "+(err.code||err))}return}
