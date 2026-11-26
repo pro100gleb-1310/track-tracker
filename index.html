@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Путевой учёт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@600;700&display=swap">
+<style>
+/* Layout: one narrow column like a driver's logbook, sticky month bar on top, tab bar fixed at the bottom for thumbs. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --line:#dde0da; --fg:#1d2226; --muted:#68707a;
+  --accent:#e0a100; --accent-ink:#1d2226; --accent-soft:#fdf1cc;
+  --good:#2f7d4f; --bad:#b23b2e; --fuel:#3a6ea5;
+  --display:"Unbounded","Onest",system-ui,sans-serif;
+  --body:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15191c; --surface:#1e2327; --line:#2d343a; --fg:#eceee9; --muted:#9aa3ab;
+  --accent:#f2b81f; --accent-ink:#15191c; --accent-soft:#3a3115;
+  --good:#5fbf86; --bad:#e2715f; --fuel:#7fa9d8; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15191c; --surface:#1e2327; --line:#2d343a; --fg:#eceee9; --muted:#9aa3ab;
+  --accent:#f2b81f; --accent-ink:#15191c; --accent-soft:#3a3115;
+  --good:#5fbf86; --bad:#e2715f; --fuel:#7fa9d8; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 calc(84px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:flex;align-items:center;gap:12px;justify-content:space-between;border-bottom:1px solid var(--line)}
+h1{font-family:var(--display);font-size:16px;margin:0;letter-spacing:.01em;white-space:nowrap}
+h1 span{display:inline-block;width:10px;height:18px;background:var(--accent);margin-right:8px;vertical-align:-2px;transform:skewX(-14deg)}
+.month{display:flex;align-items:center;gap:4px}
+.month button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:18px;cursor:pointer}
+.month b{min-width:112px;text-align:center;font-weight:600;font-size:15px}
+h2{font-family:var(--display);font-size:15px;margin:0;font-weight:600}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.num{font-variant-numeric:tabular-nums}
+.total{display:flex;flex-direction:column;gap:2px}
+.total .big{font-family:var(--display);font-size:32px;font-weight:700;line-height:1.1}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:10px;background:var(--bg)}
+.stat .v{font-weight:700;font-size:18px}
+.stat small{color:var(--muted)}
+.stat.fuel{grid-column:1/-1;border:1px dashed var(--line);background:transparent}
+.stat.fuel .v{color:var(--fuel)}
+.note{font-size:13px;color:var(--muted)}
+.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.rbtn{text-align:left;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font:inherit;min-width:0}
+.rbtn:hover,.rbtn:focus-visible{border-color:var(--accent);outline:none;background:var(--accent-soft)}
+.rbtn b{font-weight:600;overflow-wrap:anywhere}
+.rbtn span{color:var(--muted);font-size:14px}
+.rbtn.flash{background:var(--accent);color:var(--accent-ink)}
+form{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>label{flex:1 1 120px;min-width:0}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+input{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 14px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+.btn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ul.list li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+ul.list li:first-child{border-top:0}
+.li-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.li-main b{font-weight:600;overflow-wrap:anywhere}
+.li-main small{color:var(--muted)}
+.li-amt{font-weight:700;white-space:nowrap}
+.li-amt.fuel{color:var(--fuel)}
+.del{border:1px solid transparent;background:transparent;color:var(--muted);border-radius:8px;padding:6px 8px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.del:hover{border-color:var(--line)}
+.del.armed{background:var(--bad);color:#fff}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));display:flex;justify-content:center}
+nav .in{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:100%;max-width:560px}
+nav button{font:inherit;font-size:12px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:8px 2px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:22px;height:22px}
+nav button[aria-current="page"]{color:var(--fg);background:var(--accent-soft)}
+.banner{font-size:13px;padding:10px 12px;border-radius:10px;background:var(--accent-soft);color:var(--fg)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:9;max-width:calc(100% - 32px);text-align:center}
+details summary{cursor:pointer;font-weight:600;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:" ▾";color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.rbtn,.del,.btn{transition:background .15s,border-color .15s}}
+textarea{font:13px/1.4 ui-monospace,Menlo,monospace;width:100%;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px}
+html{background:var(--bg)}body{margin:0;-webkit-text-size-adjust:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1><span></span>Путевой учёт</h1>
+    <div class="month">
+      <button id="mPrev" aria-label="Предыдущий месяц">‹</button>
+      <b id="mLabel" class="num">—</b>
+      <button id="mNext" aria-label="Следующий месяц">›</button>
+    </div>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main id="view" class="wrap"></main>
+</div>
+
+<nav><div class="in">
+  <button data-tab="sum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Итоги</button>
+  <button data-tab="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 16V6h13v10M14 9h4l4 4v3h-8"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg>Ходки</button>
+  <button data-tab="pallets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8h20M2 14h20M2 20h20M5 8v12M12 8v12M19 8v12M4 4h16"/></svg>Поддоны</button>
+  <button data-tab="fuel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 4 0V8l-3-3"/></svg>Заправки</button>
+</div></nav>
+
+<script>
+(function(){
+"use strict";
+const COLS=["routes","trips","pallets","fuel"];
+const S={routes:[],trips:[],pallets:[],fuel:[]};
+let tab="sum";
+try{const t=localStorage.getItem("tab");if(t)tab=t}catch(e){}
+const now=new Date();
+let ym={y:now.getFullYear(),m:now.getMonth()};
+let mode="loading"; // loading | cloud | local
+
+
+const MONTHS=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const rub=n=>(Math.round((+n||0)*100)/100).toLocaleString("ru-RU",{maximumFractionDigits:2})+" грн";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+const fmtDate=s=>{if(!s)return"";const [y,m,d]=s.split("-");return d+"."+m+"."+y};
+const inMonth=s=>{if(!s)return false;const [y,m]=s.split("-").map(Number);return y===ym.y&&m-1===ym.m};
+const num=v=>{const n=parseFloat(String(v).replace(",",".").replace(/\s/g,""));return isFinite(n)?n:NaN};
+const byDate=(a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0);
+
+/* ---------- storage: Telegram CloudStorage (synced to the user's Telegram account), browser storage outside Telegram ---------- */
+const TG=window.Telegram&&Telegram.WebApp;
+const inTG=!!(TG&&TG.initData);
+const CS=inTG&&TG.isVersionAtLeast&&TG.isVersionAtLeast("6.9")?TG.CloudStorage:null;
+const CHUNK=3000;
+let lastChunks=[];
+const cs=(fn,...a)=>new Promise((res,rej)=>CS[fn](...a,(e,v)=>e?rej(e):res(v)));
+async function loadAll(){
+  let json="";
+  if(CS){
+    const meta=await cs("getItems",["n"]);const n=+meta.n||0;
+    if(n){const keys=[...Array(n).keys()].map(i=>"d"+i);const v=await cs("getItems",keys);lastChunks=keys.map(k=>v[k]||"");json=lastChunks.join("")}
+  }else{try{json=localStorage.getItem("uchet")||""}catch(e){}}
+  if(json){try{const o=JSON.parse(json);COLS.forEach(c=>S[c]=Array.isArray(o[c])?o[c]:[])}catch(e){toast("Не удалось прочитать сохранённые записи")}}
+}
+let saving=Promise.resolve();
+function persist(){
+  const json=JSON.stringify(S);
+  saving=saving.then(async()=>{
+    if(!CS){try{localStorage.setItem("uchet",json)}catch(e){}return}
+    const chunks=[];for(let i=0;i<json.length;i+=CHUNK)chunks.push(json.slice(i,i+CHUNK));
+    for(let i=0;i<chunks.length;i++){if(chunks[i]!==lastChunks[i])await cs("setItem","d"+i,chunks[i])}
+    if(chunks.length!==lastChunks.length){await cs("setItem","n",String(chunks.length));
+      const extra=[];for(let i=chunks.length;i<lastChunks.length;i++)extra.push("d"+i);if(extra.length)await cs("removeItems",extra)}
+    lastChunks=chunks;
+  }).catch(e=>toast("Не сохранилось в облако Telegram: "+e));
+  return saving;
+}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+async function add(c,data){data.id=uid();data.createdAt=Date.now();S[c].push(data);render();haptic("success");await persist()}
+async function remove(c,id){S[c]=S[c].filter(x=>x.id!==id);render();haptic("warning");await persist()}
+async function patch(c,id,data){const x=S[c].find(x=>x.id===id);if(x)Object.assign(x,data);render();await persist()}
+function haptic(t){try{TG&&TG.HapticFeedback&&TG.HapticFeedback.notificationOccurred(t)}catch(e){}}
+
+function applyTheme(){if(inTG)document.documentElement.setAttribute("data-theme",TG.colorScheme==="dark"?"dark":"light")}
+async function boot(){
+  if(inTG){try{TG.ready();TG.expand();applyTheme();TG.onEvent("themeChanged",applyTheme);
+    const h=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();TG.setHeaderColor&&TG.setHeaderColor(h);TG.setBackgroundColor&&TG.setBackgroundColor(h)}catch(e){}}
+  else banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
+  render();
+  try{await loadAll()}catch(e){toast("Ошибка загрузки: "+e)}
+  mode="ready";render();
+}
+
+/* ---------- UI helpers ---------- */
+function banner(t){const b=document.getElementById("banner");b.textContent=t;b.hidden=!t}
+let toastT;
+function toast(t){let el=document.querySelector(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2200)}
+function delBtn(c,id){return `<button class="del" data-del="${esc(c)}" data-id="${esc(id)}">Удалить</button>`}
+
+function totals(){
+  const t=S.trips.filter(x=>inMonth(x.date)), p=S.pallets.filter(x=>inMonth(x.date)), f=S.fuel.filter(x=>inMonth(x.date));
+  const sum=(a,k)=>a.reduce((s,x)=>s+(+x[k]||0),0);
+  return {t,p,f,tSum:sum(t,"price"),pSum:sum(p,"amount"),pQty:sum(p,"qty"),fSum:sum(f,"amount"),fL:sum(f,"liters")};
+}
+
+/* ---------- views ---------- */
+function vSum(){
+  const T=totals();
+  const per={};T.t.forEach(x=>{const k=x.routeName||"Без названия";per[k]=per[k]||{n:0,s:0};per[k].n++;per[k].s+=+x.price||0});
+  const rows=Object.entries(per).sort((a,b)=>b[1].s-a[1].s);
+  return `
+  <section class="card">
+    <div class="total"><span class="lbl">Доход за месяц</span><span class="big num">${rub(T.tSum+T.pSum)}</span></div>
+    <div class="split">
+      <div class="stat"><small>Ходки · ${T.t.length} шт.</small><span class="v num">${rub(T.tSum)}</span></div>
+      <div class="stat"><small>Поддоны · ${T.pQty} шт.</small><span class="v num">${rub(T.pSum)}</span></div>
+      <div class="stat fuel"><small>Заправки · ${T.f.length} раз${T.fL?` · ${(Math.round(T.fL*10)/10).toLocaleString("ru-RU")} л`:""} (не вычитаются из дохода)</small><span class="v num">${rub(T.fSum)}</span></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Ходки по маршрутам</h2>
+    ${rows.length?`<ul class="list">${rows.map(([k,v])=>`<li><div class="li-main"><b>${esc(k)}</b><small>${v.n} шт.</small></div><span class="li-amt num">${rub(v.s)}</span></li>`).join("")}</ul>`:`<p class="empty">В этом месяце ходок пока нет. Откройте вкладку «Ходки» и нажмите на маршрут, чтобы записать.</p>`}
+  </section>
+  <details class="card" id="backup"><summary>Резервная копия (CSV для Excel)</summary><p class="note">Выделите текст, скопируйте и сохраните, например, в «Избранное» Telegram.</p><textarea id="csvBox" readonly rows="6"></textarea></details>
+  ${mode==="loading"?`<p class="note">Загружаю записи…</p>`:""}`;
+}
+
+function vTrips(){
+  const list=S.trips.filter(x=>inMonth(x.date)).sort(byDate);
+  const routes=[...S.routes].sort((a,b)=>(a.name||"").localeCompare(b.name||"","ru"));
+  return `
+  <section class="card">
+    <div class="head"><h2>Записать ходку</h2><span class="note">нажмите на маршрут</span></div>
+    <label>Дата ходки<input type="date" id="tripDate" value="${today()}"></label>
+    ${routes.length?`<div class="routes">${routes.map(r=>`<button class="rbtn" data-route="${esc(r.id)}"><b>${esc(r.name)}</b><span class="num">${rub(r.price)}</span></button>`).join("")}</div>`
+    :`<p class="empty">Справочник пуст. Добавьте первый маршрут ниже, и он появится здесь кнопкой.</p>`}
+  </section>
+  <section class="card">
+    <div class="head"><h2>Ходки за ${MONTHS[ym.m].toLowerCase()}</h2><span class="li-amt num">${rub(list.reduce((s,x)=>s+(+x.price||0),0))}</span></div>
+    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b>${esc(x.routeName)}</b><small>${fmtDate(x.date)}</small></div><span class="li-amt num">${rub(x.price)}</span>${delBtn("trips",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Ходок за этот месяц нет.</p>`}
+  </section>
+  <section class="card">
+    <details id="refDetails" ${routes.length?"":"open"}>
+      <summary>Справочник маршрутов (${routes.length})</summary>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+        <form id="routeForm">
+          <div class="row">
+            <label>Маршрут<input id="rName" required placeholder="Київ — Житомир" autocomplete="off"></label>
+            <label>Стоимость, грн<input id="rPrice" required inputmode="decimal" placeholder="8000"></label>
+          </div>
+          <button class="btn" type="submit">Добавить в справочник</button>
+        </form>
+        ${routes.length?`<ul class="list">${routes.map(r=>`<li><div class="li-main"><b>${esc(r.name)}</b><small class="num">${rub(r.price)}</small></div><button class="del" data-editprice="${esc(r.id)}">Цена</button>${delBtn("routes",r.id)}</li>`).join("")}</ul>`:""}
+        <p class="note">Если цену маршрута поменять, уже записанные ходки сохранят старую сумму.</p>
+      </div>
+    </details>
+  </section>`;
+}
+
+function vPallets(){
+  const list=S.pallets.filter(x=>inMonth(x.date)).sort(byDate);
+  const q=list.reduce((s,x)=>s+(+x.qty||0),0), a=list.reduce((s,x)=>s+(+x.amount||0),0);
+  return `
+  <section class="card">
+    <h2>Сдал европоддоны</h2>
+    <form id="palForm">
+      <div class="row">
+        <label>Количество, шт.<input id="pQty" required inputmode="numeric" placeholder="20"></label>
+        <label>Получил всего, грн<input id="pAmt" required inputmode="decimal" placeholder="3000"></label>
+      </div>
+      <div class="row">
+        <label>Дата<input type="date" id="pDate" value="${today()}"></label>
+        <label>Кому / где<input id="pNote" placeholder="необязательно" autocomplete="off"></label>
+      </div>
+      <p class="note" id="pPer">&nbsp;</p>
+      <button class="btn" type="submit">Записать</button>
+    </form>
+  </section>
+  <section class="card">
+    <div class="head"><h2>За ${MONTHS[ym.m].toLowerCase()}: ${q} шт.</h2><span class="li-amt num">${rub(a)}</span></div>
+    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b class="num">${x.qty} шт. · ${rub(x.qty?x.amount/x.qty:0)}/шт.</b><small>${fmtDate(x.date)}${x.note?" · "+esc(x.note):""}</small></div><span class="li-amt num">${rub(x.amount)}</span>${delBtn("pallets",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Записей за этот месяц нет.</p>`}
+  </section>`;
+}
+
+function vFuel(){
+  const list=S.fuel.filter(x=>inMonth(x.date)).sort(byDate);
+  const a=list.reduce((s,x)=>s+(+x.amount||0),0);
+  return `
+  <section class="card">
+    <h2>Заправка</h2>
+    <form id="fuelForm">
+      <div class="row">
+        <label>Литры<input id="fL" inputmode="decimal" placeholder="300"></label>
+        <label>Сумма, грн<input id="fAmt" required inputmode="decimal" placeholder="15600"></label>
+      </div>
+      <div class="row">
+        <label>Дата<input type="date" id="fDate" value="${today()}"></label>
+        <label>Пробег, км<input id="fOdo" inputmode="numeric" placeholder="необязательно"></label>
+      </div>
+      <label>АЗС / заметка<input id="fNote" placeholder="необязательно" autocomplete="off"></label>
+      <button class="btn" type="submit">Записать заправку</button>
+    </form>
+    <p class="note">Заправки только для учёта, из дохода они не вычитаются.</p>
+  </section>
+  <section class="card">
+    <div class="head"><h2>Заправки за ${MONTHS[ym.m].toLowerCase()}</h2><span class="li-amt fuel num">${rub(a)}</span></div>
+    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b class="num">${x.liters?(x.liters+" л"):"—"}${x.liters&&x.amount?" · "+rub(x.amount/x.liters)+"/л":""}</b><small>${fmtDate(x.date)}${x.odo?" · "+Number(x.odo).toLocaleString("ru-RU")+" км":""}${x.note?" · "+esc(x.note):""}</small></div><span class="li-amt fuel num">${rub(x.amount)}</span>${delBtn("fuel",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Заправок за этот месяц нет.</p>`}
+  </section>`;
+}
+
+function render(){
+  document.getElementById("mLabel").textContent=MONTHS[ym.m]+" "+ym.y;
+  document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.tab===tab)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+  const v=document.getElementById("view");
+  const open=document.getElementById("refDetails")?.open;
+  const keep={};v.querySelectorAll("input[id]").forEach(i=>{if(i.type!=="date"||i.value)keep[i.id]=i.value});
+  v.innerHTML=({sum:vSum,trips:vTrips,pallets:vPallets,fuel:vFuel}[tab]||vSum)();
+  Object.entries(keep).forEach(([k,val])=>{const i=document.getElementById(k);if(i)i.value=val});
+  const d=document.getElementById("refDetails");if(d&&open!==undefined&&S.routes.length)d.open=open;
+  perUnit();
+}
+function perUnit(){const el=document.getElementById("pPer");if(!el)return;const q=num(document.getElementById("pQty").value),a=num(document.getElementById("pAmt").value);el.textContent=(q>0&&a>=0)?("Выходит "+rub(a/q)+" за поддон"):" "}
+
+/* ---------- events ---------- */
+document.querySelector("nav").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(!b)return;tab=b.dataset.tab;try{localStorage.setItem("tab",tab)}catch(_){}render();window.scrollTo(0,0)});
+document.getElementById("mPrev").onclick=()=>{ym.m--;if(ym.m<0){ym.m=11;ym.y--}render()};
+document.getElementById("mNext").onclick=()=>{ym.m++;if(ym.m>11){ym.m=0;ym.y++}render()};
+
+const view=document.getElementById("view");
+view.addEventListener("input",e=>{if(e.target.id==="pQty"||e.target.id==="pAmt")perUnit()});
+view.addEventListener("click",async e=>{
+  const r=e.target.closest("[data-route]");
+  if(r){
+    const route=S.routes.find(x=>x.id===r.dataset.route);if(!route)return;
+    const date=document.getElementById("tripDate").value||today();
+    r.classList.add("flash");setTimeout(()=>r.classList.remove("flash"),400);
+    try{await add("trips",{routeId:route.id,routeName:route.name,price:+route.price,date});toast("Записано: "+route.name+", "+fmtDate(date))}catch(err){toast("Не сохранилось: "+(err.code||err))}
+    return;
+  }
+  const d=e.target.closest("[data-del]");
+  if(d){
+    if(!d.classList.contains("armed")){document.querySelectorAll(".del.armed").forEach(x=>{x.classList.remove("armed");x.textContent="Удалить"});d.classList.add("armed");d.textContent="Точно?";setTimeout(()=>{if(d.isConnected){d.classList.remove("armed");d.textContent="Удалить"}},3000);return}
+    try{await remove(d.dataset.del,d.dataset.id);toast("Удалено")}catch(err){toast("Не удалилось: "+(err.code||err))}
+    return;
+  }
+  const ep=e.target.closest("[data-editprice]");
+  if(ep){
+    const li=ep.closest("li");const route=S.routes.find(x=>x.id===ep.dataset.editprice);if(!route)return;
+    li.innerHTML=`<div class="li-main"><b>${esc(route.name)}</b></div><input id="ep_${esc(route.id)}" inputmode="decimal" value="${esc(route.price)}" style="max-width:110px"><button class="del" data-saveprice="${esc(route.id)}">Сохранить</button>`;
+    li.querySelector("input").focus();return;
+  }
+  const sp=e.target.closest("[data-saveprice]");
+  if(sp){const v=num(document.getElementById("ep_"+sp.dataset.saveprice).value);if(!(v>=0)){toast("Введите цену числом");return}
+    try{await patch("routes",sp.dataset.saveprice,{price:v});toast("Цена обновлена");render()}catch(err){toast("Не сохранилось: "+(err.code||err))}return}
+});
+view.addEventListener("submit",async e=>{
+  e.preventDefault();const f=e.target;
+  try{
+    if(f.id==="routeForm"){
+      const name=document.getElementById("rName").value.trim(),price=num(document.getElementById("rPrice").value);
+      if(!name||!(price>=0)){toast("Укажите маршрут и цену числом");return}
+      await add("routes",{name,price});toast("Маршрут добавлен");
+      document.getElementById("rName").value="";document.getElementById("rPrice").value="";render();
+    }
+    if(f.id==="palForm"){
+      const qty=num(document.getElementById("pQty").value),amount=num(document.getElementById("pAmt").value);
+      if(!(qty>0)||!(amount>=0)){toast("Укажите количество и сумму числами");return}
+      await add("pallets",{qty,amount,date:document.getElementById("pDate").value||today(),note:document.getElementById("pNote").value.trim()});
+      toast("Поддоны записаны");["pQty","pAmt","pNote"].forEach(i=>document.getElementById(i).value="");render();
+    }
+    if(f.id==="fuelForm"){
+      const amount=num(document.getElementById("fAmt").value),liters=num(document.getElementById("fL").value),odo=num(document.getElementById("fOdo").value);
+      if(!(amount>=0)){toast("Укажите сумму числом");return}
+      await add("fuel",{amount,liters:liters>0?liters:null,odo:odo>0?odo:null,date:document.getElementById("fDate").value||today(),note:document.getElementById("fNote").value.trim()});
+      toast("Заправка записана");["fAmt","fL","fOdo","fNote"].forEach(i=>document.getElementById(i).value="");render();
+    }
+  }catch(err){toast("Не сохранилось: "+(err.code||err))}
+});
+
+function buildCsv(){
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+  const rows=[["Тип","Дата","Описание","Количество/литры","Сумма, грн","Пробег","Заметка"]];
+  S.trips.slice().sort(byDate).forEach(x=>rows.push(["Ходка",x.date,x.routeName,1,x.price,"",""]));
+  S.pallets.slice().sort(byDate).forEach(x=>rows.push(["Поддоны",x.date,"Обмен поддонов",x.qty,x.amount,"",x.note]));
+  S.fuel.slice().sort(byDate).forEach(x=>rows.push(["Заправка",x.date,"Заправка",x.liters??"",x.amount,x.odo??"",x.note]));
+  return rows.map(r=>r.map(q).join(";")).join("\n");
+}
+view.addEventListener("toggle",e=>{if(e.target.id==="backup"&&e.target.open){const b=document.getElementById("csvBox");b.value=buildCsv();b.focus();b.select()}},true);
+
+boot();
+})();
+</script>
+</body>
+</html>
