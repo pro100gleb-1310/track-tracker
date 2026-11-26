@@ -187,7 +187,7 @@ async function boot(){
   else banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
   render();
   try{await loadAll()}catch(e){toast("Ошибка загрузки: "+e)}
-  mode="ready";render();
+  mode="ready";checkHome();render();
 }
 
 /* ---------- UI helpers ---------- */
@@ -220,6 +220,7 @@ function vSum(){
     <h2>Ходки по маршрутам</h2>
     ${rows.length?`<ul class="list">${rows.map(([k,v])=>`<li><div class="li-main"><b>${esc(k)}</b><small>${v.n} шт.</small></div><span class="li-amt num">${rub(v.s)}</span></li>`).join("")}</ul>`:`<p class="empty">В этом месяце ходок пока нет. Откройте вкладку «Ходки» и нажмите на маршрут, чтобы записать.</p>`}
   </section>
+  ${homeStatus==="missed"||homeStatus==="unknown"?`<button class="btn ghost" id="addHome">Добавить ярлык на экран Домой</button>`:""}
   <details class="card" id="backup"><summary>Резервная копия (CSV для Excel)</summary><p class="note">Выделите текст, скопируйте и сохраните, например, в «Избранное» Telegram.</p><textarea id="csvBox" readonly rows="6"></textarea></details>
   ${mode==="loading"?`<p class="note">Загружаю записи…</p>`:""}`;
 }
@@ -307,6 +308,14 @@ function vFuel(){
   </section>`;
 }
 
+let homeStatus="unsupported";
+function checkHome(){
+  try{
+    if(!inTG||!TG.isVersionAtLeast("8.0")||!TG.checkHomeScreenStatus)return;
+    TG.checkHomeScreenStatus(st=>{homeStatus=st||"unsupported";if(tab==="sum")render()});
+    TG.onEvent("homeScreenAdded",()=>{homeStatus="added";toast("Ярлык добавлен");if(tab==="sum")render()});
+  }catch(e){}
+}
 function render(){
   document.getElementById("mLabel").textContent=MONTHS[ym.m]+" "+ym.y;
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.tab===tab)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
@@ -328,6 +337,7 @@ document.getElementById("mNext").onclick=()=>{ym.m++;if(ym.m>11){ym.m=0;ym.y++}r
 const view=document.getElementById("view");
 view.addEventListener("input",e=>{if(e.target.id==="pQty"||e.target.id==="pAmt")perUnit()});
 view.addEventListener("click",async e=>{
+  if(e.target.id==="addHome"){try{TG.addToHomeScreen()}catch(err){toast("Telegram на этом телефоне не умеет добавлять ярлык")}return}
   const r=e.target.closest("[data-route]");
   if(r){
     const route=S.routes.find(x=>x.id===r.dataset.route);if(!route)return;
