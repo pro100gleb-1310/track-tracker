@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Путевой учёт",
+    "slug": "putevoy-uchet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#15191c",
+    "splash": { "backgroundColor": "#15191c" },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "ua.putevoy.uchet" },
+    "android": { "package": "ua.putevoy.uchet.expo" },
+    "runtimeVersion": { "policy": "sdkVersion" },
+    "plugins": ["expo-status-bar"]
+  }
+}
