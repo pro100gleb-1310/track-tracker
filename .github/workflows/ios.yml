@@ -1,0 +1,49 @@
+name: iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths: [index.html, ios/**, .github/workflows/ios.yml]
+  pull_request:
+    paths: [index.html, ios/**, .github/workflows/ios.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Copy the app page
+        run: mkdir -p ios/www && cp index.html ios/www/
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build (unsigned; Sideloadly/AltStore sign it with the user's Apple ID)
+        working-directory: ios
+        run: |
+          xcodebuild -project PutevoyUchet.xcodeproj -scheme PutevoyUchet -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/PutevoyUchet.app Payload/
+          zip -qry putevoy-uchet.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: putevoy-uchet-ipa
+          path: putevoy-uchet.ipa
+      - name: Publish to the "ios" release (a stable download link)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios
+          name: Путевой учёт для iPhone
+          body: Скачайте putevoy-uchet.ipa на компьютер и установите на iPhone через Sideloadly с бесплатным Apple ID.
+          files: putevoy-uchet.ipa
+          make_latest: false

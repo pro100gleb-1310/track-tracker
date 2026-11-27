@@ -7,3 +7,11 @@ Telegram Mini App для учёта доходов водителя: ходки 
 ## Android
 
 Папка `android/` — приложение для Android, которое показывает тот же `index.html` (копируется при сборке), записи хранит в телефоне. APK собирает GitHub Actions (`.github/workflows/android.yml`); после изменений в `main` свежий `putevoy-uchet.apk` появляется в релизе «android» в разделе Releases. Перенос записей между Telegram и Android: вкладка «Итоги» → «Перенос записей».
+
+## iPhone
+
+Через Expo Go (основной способ): папка `expo/` — приложение Expo с тем же `index.html` в WebView, записи в телефоне (AsyncStorage). После изменений в `main` workflow `.github/workflows/expo.yml` публикует его через EAS Update в аккаунт Expo владельца (нужен секрет `EXPO_TOKEN`). На iPhone: Expo Go из App Store → войти в тот же аккаунт → проект «Путевой учёт».
+
+Приложение: папка `ios/` — обёртка WKWebView с тем же `index.html` (копируется при сборке), записи хранит в телефоне. Неподписанный `putevoy-uchet.ipa` собирает GitHub Actions (`.github/workflows/ios.yml`) и кладёт в релиз «ios»; на iPhone ставится через Sideloadly с бесплатным Apple ID (подпись на 7 дней, потом переустановка поверх, записи сохраняются).
+
+Без установки приложения та же страница устанавливается на iPhone без App Store: открыть https://pro100gleb-1310.github.io/track-tracker/ в Safari → «Поделиться» → «На экран „Домой“». Работает как отдельное приложение на весь экран и без интернета (`manifest.webmanifest`, `sw.js`, `icons/`). Записи хранятся в телефоне; перенос из Telegram или Android: «Итоги» → «Перенос записей».
