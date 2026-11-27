@@ -7,3 +7,7 @@ Telegram Mini App для учёта доходов водителя: ходки 
 ## Android
 
 Папка `android/` — приложение для Android, которое показывает тот же `index.html` (копируется при сборке), записи хранит в телефоне. APK собирает GitHub Actions (`.github/workflows/android.yml`); после изменений в `main` свежий `putevoy-uchet.apk` появляется в релизе «android» в разделе Releases. Перенос записей между Telegram и Android: вкладка «Итоги» → «Перенос записей».
+
+## iPhone
+
+Та же страница устанавливается на iPhone без App Store: открыть https://pro100gleb-1310.github.io/track-tracker/ в Safari → «Поделиться» → «На экран „Домой“». Работает как отдельное приложение на весь экран и без интернета (`manifest.webmanifest`, `sw.js`, `icons/`). Записи хранятся в телефоне; перенос из Telegram или Android: «Итоги» → «Перенос записей».

@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <title>Путевой учёт</title>
+<!-- installable on iPhone via Safari → Share → Add to Home Screen -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Путевой учёт">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#f3f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15191c" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@600;700&display=swap">
 <style>
@@ -112,6 +122,8 @@ ul.list li{flex-wrap:wrap}
 .km{font-size:15px;color:var(--muted);margin-top:4px}.km b{color:var(--fg)}
 textarea{font:13px/1.4 ui-monospace,Menlo,monospace;width:100%;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px}
 html{background:var(--bg)}body{margin:0;-webkit-text-size-adjust:100%}
+/* iOS zooms the page when a field under 16px gets focus */
+@supports (-webkit-touch-callout:none){textarea{font-size:16px}}
 </style>
 </head>
 <body>
@@ -162,6 +174,8 @@ const byDate=(a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.
 const TG=window.Telegram&&Telegram.WebApp;
 const inTG=!!(TG&&TG.initData);
 const inApp=/PutevoyUchet\/Android/.test(navigator.userAgent); // the Android APK wraps this same page
+const isIOS=/iP(hone|od|ad)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+const standalone=navigator.standalone===true||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches); // started from the home-screen icon
 const CS=inTG&&TG.isVersionAtLeast&&TG.isVersionAtLeast("6.9")?TG.CloudStorage:null;
 const CHUNK=3000;
 let lastChunks=[];
@@ -197,7 +211,10 @@ function applyTheme(){if(inTG)document.documentElement.setAttribute("data-theme"
 async function boot(){
   if(inTG){try{TG.ready();TG.expand();try{TG.isVersionAtLeast("7.7")&&TG.disableVerticalSwipes()}catch(_){}try{if(TG.isVersionAtLeast("8.0")&&/^(ios|android)$/.test(TG.platform)&&!TG.isFullscreen)TG.requestFullscreen()}catch(_){}applyTheme();TG.onEvent("themeChanged",applyTheme);
     const h=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();TG.setHeaderColor&&TG.setHeaderColor(h);TG.setBackgroundColor&&TG.setBackgroundColor(h)}catch(e){}}
+  else if(standalone){try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}}
+  else if(isIOS)banner("Чтобы установить на iPhone: кнопка «Поделиться» внизу Safari → «На экран „Домой“». Записи из Safari в приложение не попадут, поэтому вносите их уже в установленном приложении.");
   else if(!inApp)banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
+  if(!inTG&&!inApp&&(location.protocol==="https:"||location.hostname==="localhost")&&"serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
   render();
   try{await loadAll()}catch(e){toast("Ошибка загрузки: "+e)}
   mode="ready";render();
@@ -244,7 +261,7 @@ function vSum(){
     ${rows.length?`<ul class="list">${rows.map(([k,v])=>`<li><div class="li-main"><b>${esc(k)}</b><small>${v.n} шт.</small></div><span class="li-amt num">${rub(v.s)}</span></li>`).join("")}</ul>`:`<p class="empty">В этом месяце ходок пока нет. Откройте вкладку «Ходки» и нажмите на маршрут, чтобы записать.</p>`}
   </section>
   <details class="card" id="backup"><summary>Резервная копия (CSV для Excel)</summary><p class="note">Выделите текст, скопируйте и сохраните, например, в «Избранное» Telegram.</p><textarea id="csvBox" readonly rows="6"></textarea></details>
-  <details class="card" id="transfer"><summary>Перенос записей (Telegram ↔ Android)</summary><p class="note">На старом устройстве нажмите «Скопировать код». На новом вставьте код в поле ниже и нажмите «Добавить записи». Уже существующие записи не дублируются.</p><div class="row"><button class="btn ghost" type="button" data-copycode>Скопировать код</button></div><textarea id="codeBox" rows="4" placeholder="Вставьте сюда код переноса"></textarea><div class="row"><button class="btn" type="button" data-importcode>Добавить записи</button></div></details>
+  <details class="card" id="transfer"><summary>Перенос записей (Telegram ↔ Android ↔ iPhone)</summary><p class="note">На старом устройстве нажмите «Скопировать код». На новом вставьте код в поле ниже и нажмите «Добавить записи». Уже существующие записи не дублируются.</p><div class="row"><button class="btn ghost" type="button" data-copycode>Скопировать код</button></div><textarea id="codeBox" rows="4" placeholder="Вставьте сюда код переноса"></textarea><div class="row"><button class="btn" type="button" data-importcode>Добавить записи</button></div></details>
   ${mode==="loading"?`<p class="note">Загружаю записи…</p>`:""}`;
 }
 

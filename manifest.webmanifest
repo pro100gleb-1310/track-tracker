@@ -1,0 +1,17 @@
+{
+  "name": "Путевой учёт",
+  "short_name": "Путевой учёт",
+  "description": "Учёт доходов водителя: ходки, европоддоны, заправки",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15191c",
+  "theme_color": "#15191c",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
