@@ -173,7 +173,7 @@ const byDate=(a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.
 /* ---------- storage: Telegram CloudStorage (synced to the user's Telegram account), browser storage outside Telegram ---------- */
 const TG=window.Telegram&&Telegram.WebApp;
 const inTG=!!(TG&&TG.initData);
-const inApp=/PutevoyUchet\/Android/.test(navigator.userAgent); // the Android APK wraps this same page
+const inApp=/PutevoyUchet\/(Android|iOS)/.test(navigator.userAgent); // the Android and iPhone apps wrap this same page
 const isIOS=/iP(hone|od|ad)/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 const standalone=navigator.standalone===true||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches); // started from the home-screen icon
 const CS=inTG&&TG.isVersionAtLeast&&TG.isVersionAtLeast("6.9")?TG.CloudStorage:null;
@@ -211,6 +211,7 @@ function applyTheme(){if(inTG)document.documentElement.setAttribute("data-theme"
 async function boot(){
   if(inTG){try{TG.ready();TG.expand();try{TG.isVersionAtLeast("7.7")&&TG.disableVerticalSwipes()}catch(_){}try{if(TG.isVersionAtLeast("8.0")&&/^(ios|android)$/.test(TG.platform)&&!TG.isFullscreen)TG.requestFullscreen()}catch(_){}applyTheme();TG.onEvent("themeChanged",applyTheme);
     const h=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();TG.setHeaderColor&&TG.setHeaderColor(h);TG.setBackgroundColor&&TG.setBackgroundColor(h)}catch(e){}}
+  else if(inApp){}
   else if(standalone){try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}}
   else if(isIOS)banner("Чтобы установить на iPhone: кнопка «Поделиться» внизу Safari → «На экран „Домой“». Записи из Safari в приложение не попадут, поэтому вносите их уже в установленном приложении.");
   else if(!inApp)banner("Открыто не в Telegram: записи сохраняются только в этом браузере.");
