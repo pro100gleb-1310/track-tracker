@@ -28,10 +28,10 @@
   --accent:#f2b81f; --accent-ink:#15191c; --accent-soft:#3a3115;
   --good:#5fbf86; --bad:#e2715f; --fuel:#7fa9d8; color-scheme:dark}
 *{box-sizing:border-box}
-html,body{height:100%}
+html,body{min-height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.4;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  padding-block:0 calc(84px + max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px)))}
+  padding-block:0 calc(104px + max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px)))}
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 body{padding-top:var(--top)}
 body::before{content:"";position:fixed;inset:0 0 auto;height:var(--top);z-index:10;background:var(--bg)}
