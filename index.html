@@ -98,6 +98,14 @@ input[type="date"]::-webkit-date-and-time-value{text-align:left}
 ul.list li{flex-wrap:wrap}
 @media (max-width:400px){header{flex-direction:column;align-items:stretch}.month{margin-left:0;justify-content:space-between}.month b{flex:1}}
 @media (max-width:360px){.del{padding:6px 4px}}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.seg button{font:inherit;font-weight:600;border:0;border-radius:9px;padding:10px;background:transparent;color:var(--muted);cursor:pointer}
+.seg button[aria-checked="true"]{background:var(--accent);color:var(--accent-ink)}
+.ftab{width:100%;border-collapse:collapse;font-size:15px}
+.ftab th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;padding:0 6px 6px 0}
+.ftab td{padding:9px 6px 9px 0;border-top:1px solid var(--line);vertical-align:middle;font-weight:600}
+.ftab td small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.ftab th:last-child,.ftab td:last-child{text-align:right;padding-right:0;width:1%}
 textarea{font:13px/1.4 ui-monospace,Menlo,monospace;width:100%;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px}
 html{background:var(--bg)}body{margin:0;-webkit-text-size-adjust:100%}
 </style>
@@ -224,7 +232,7 @@ function vSum(){
     <div class="split">
       <div class="stat"><small>Ходки · ${T.t.length} шт.</small><span class="v num">${rub(T.tSum)}</span></div>
       <div class="stat"><small>Поддоны · ${T.pQty} шт.</small><span class="v num">${rub(T.pSum)}</span></div>
-      <div class="stat fuel"><small>Заправки · ${T.f.length} ${(n=>{const d=n%10,h=n%100;return d>=2&&d<=4&&(h<12||h>14)?"раза":"раз"})(T.f.length)}${T.fL?` · ${fmt1(T.fL)} л`:""}${T.fRate?` · расход ${fmt1(T.fRate.r)} л/100 км`:""} (не вычитаются из дохода)</small><span class="v num">${rub(T.fSum)}</span></div>
+      <div class="stat fuel"><small>Заправки · ${T.f.length} ${(n=>{const d=n%10,h=n%100;return d>=2&&d<=4&&(h<12||h>14)?"раза":"раз"})(T.f.length)}${T.fL?` · ${fmt1(T.fL)} л`:""}${T.fRate?" · средний расход":""} </small><span class="v num">${T.fRate?fmt1(T.fRate.r)+" л/100 км":fmt1(T.fL)+" л"}</span></div>
     </div>
   </section>
   <section class="card">
@@ -293,31 +301,32 @@ function vPallets(){
   </section>`;
 }
 
+let fuelPlace="station";
+const PLACES={station:"Заправка",garage:"Гараж"};
 function vFuel(){
   const list=S.fuel.filter(x=>inMonth(x.date)).sort(byDate);
-  const a=list.reduce((s,x)=>s+(+x.amount||0),0);
   const per=consumption(), mr=monthRate(list,per);
+  const L=list.reduce((s,x)=>s+(+x.liters||0),0);
   return `
   <section class="card">
     <h2>Заправка</h2>
     <form id="fuelForm">
-      <div class="row">
-        <label>Литры<input id="fL" inputmode="decimal" placeholder="300"></label>
-        <label>Сумма, грн<input id="fAmt" required inputmode="decimal" placeholder="15600"></label>
+      <div class="seg" role="radiogroup" aria-label="Где заправился">
+        ${Object.entries(PLACES).map(([k,v])=>`<button type="button" role="radio" aria-checked="${fuelPlace===k}" data-place="${k}">${v}</button>`).join("")}
       </div>
       <div class="row">
-        <label>Дата<input type="date" id="fDate" value="${today()}"></label>
+        <label>Литры<input id="fL" required inputmode="decimal" placeholder="300"></label>
         <label>Пробег (одометр)<input id="fOdo" inputmode="numeric" placeholder="245300"></label>
       </div>
-      <label>АЗС / заметка<input id="fNote" placeholder="необязательно" autocomplete="off"></label>
+      <label>Дата<input type="date" id="fDate" value="${today()}"></label>
       <button class="btn" type="submit">Записать заправку</button>
     </form>
-    <p class="note">Расход считается между двумя заправками: литры этой заправки делятся на километры с прошлой заправки. Заправляйтесь до полного бака и вписывайте пробег каждый раз, тогда цифра будет точной. Из дохода заправки не вычитаются.</p>
+    <p class="note">Расход считается между двумя заправками: литры этой заправки делятся на километры с прошлой. Заправляйтесь до полного бака и вписывайте пробег каждый раз, тогда цифра будет точной.</p>
   </section>
   <section class="card">
-    <div class="head"><h2>Заправки за ${MONTHS[ym.m].toLowerCase()}</h2><span class="li-amt fuel num">${rub(a)}</span></div>
+    <div class="head"><h2>Заправки за ${MONTHS[ym.m].toLowerCase()}</h2><span class="li-amt fuel num">${fmt1(L)} л</span></div>
     ${mr?`<div class="stat"><small>Средний расход за месяц · ${Math.round(mr.km).toLocaleString("ru-RU")} км</small><span class="v num">${fmt1(mr.r)} л/100 км</span></div>`:""}
-    ${list.length?`<ul class="list">${list.map(x=>`<li><div class="li-main"><b class="num">${x.liters?(fmt1(+x.liters)+" л"):"—"}${per[x.id]?" · "+fmt1(per[x.id].r)+" л/100 км":""}</b><small>${fmtDate(x.date)}${x.odo?" · "+Number(x.odo).toLocaleString("ru-RU")+" км":""}${per[x.id]?" · +"+Math.round(per[x.id].km).toLocaleString("ru-RU")+" км":""}${x.note?" · "+esc(x.note):""}</small></div><span class="li-amt fuel num">${rub(x.amount)}</span>${delBtn("fuel",x.id)}</li>`).join("")}</ul>`:`<p class="empty">Заправок за этот месяц нет.</p>`}
+    ${list.length?`<table class="ftab num"><thead><tr><th>Дата</th><th>Литры</th><th>Расход</th><th></th></tr></thead><tbody>${list.map(x=>`<tr><td>${fmtDate(x.date)}<small>${PLACES[x.place]||"Заправка"}</small></td><td>${x.liters?fmt1(+x.liters):"—"}</td><td>${per[x.id]?fmt1(per[x.id].r)+"<small>л/100 км</small>":"—"}</td><td>${delBtn("fuel",x.id)}</td></tr>`).join("")}</tbody></table>`:`<p class="empty">Заправок за этот месяц нет.</p>`}
   </section>`;
 }
 
@@ -342,6 +351,7 @@ document.getElementById("mNext").onclick=()=>{ym.m++;if(ym.m>11){ym.m=0;ym.y++}r
 const view=document.getElementById("view");
 view.addEventListener("input",e=>{if(e.target.id==="pQty"||e.target.id==="pAmt")perUnit()});
 view.addEventListener("click",async e=>{
+  const pl=e.target.closest("[data-place]");if(pl){fuelPlace=pl.dataset.place;document.querySelectorAll("[data-place]").forEach(b=>b.setAttribute("aria-checked",String(b===pl)));return}
   const r=e.target.closest("[data-route]");
   if(r){
     const route=S.routes.find(x=>x.id===r.dataset.route);if(!route)return;
@@ -391,10 +401,10 @@ view.addEventListener("submit",async e=>{
       toast("Поддоны записаны");["pQty","pAmt","pNote"].forEach(i=>document.getElementById(i).value="");render();
     }
     if(f.id==="fuelForm"){
-      const amount=num(document.getElementById("fAmt").value),liters=num(document.getElementById("fL").value),odo=num(document.getElementById("fOdo").value);
-      if(!(amount>=0)){toast("Укажите сумму числом");return}
-      await add("fuel",{amount,liters:liters>0?liters:null,odo:odo>0?odo:null,date:document.getElementById("fDate").value||today(),note:document.getElementById("fNote").value.trim()});
-      toast("Заправка записана");["fAmt","fL","fOdo","fNote"].forEach(i=>document.getElementById(i).value="");render();
+      const liters=num(document.getElementById("fL").value),odo=num(document.getElementById("fOdo").value);
+      if(!(liters>0)){toast("Укажите литры числом");return}
+      await add("fuel",{liters,odo:odo>0?odo:null,place:fuelPlace,date:document.getElementById("fDate").value||today()});
+      toast("Заправка записана");["fL","fOdo"].forEach(i=>document.getElementById(i).value="");render();
     }
   }catch(err){toast("Не сохранилось: "+(err.code||err))}
 });
@@ -404,7 +414,7 @@ function buildCsv(){
   const rows=[["Тип","Дата","Описание","Количество/литры","Сумма, грн","Пробег","Заметка"]];
   S.trips.slice().sort(byDate).forEach(x=>rows.push(["Ходка",x.date,x.routeName,1,x.price,"",""]));
   S.pallets.slice().sort(byDate).forEach(x=>rows.push(["Поддоны",x.date,"Обмен поддонов",x.qty,x.amount,"",x.note]));
-  S.fuel.slice().sort(byDate).forEach(x=>rows.push(["Заправка",x.date,"Заправка",x.liters??"",x.amount,x.odo??"",x.note]));
+  S.fuel.slice().sort(byDate).forEach(x=>rows.push(["Заправка",x.date,PLACES[x.place]||"Заправка",x.liters??"","",x.odo??"",""]));
   return rows.map(r=>r.map(q).join(";")).join("\n");
 }
 view.addEventListener("toggle",e=>{if(e.target.id==="backup"&&e.target.open){const b=document.getElementById("csvBox");b.value=buildCsv();b.focus();b.select()}},true);
